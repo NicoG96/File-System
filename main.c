@@ -6,24 +6,8 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    if(argc == 2) {
-        //open existing fs
-        if(!(fs = fopen(argv[1], "r+"))) {
-
-            //if it doesn't exist, make one
-            if(!(fs = fopen(argv[1], "w+"))) {
-
-
-                //change to function
-
-
-
-                perror("File System open");
-                exit(EXIT_FAILURE);
-            }
-
-        }
-    }
+    //mount and map the disk
+    map();
 
     //boot up shell interface
     shell();
