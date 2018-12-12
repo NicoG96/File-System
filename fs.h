@@ -8,7 +8,7 @@
 /* MACROS */
 #define TOTAL_BLOCKS 3906   /* blocks, floor of 2MB file / 512 */
 #define MAX_FILE_SIZE 64    /* blocks */
-#define BLOCK_SIZE 512      /* bytes */
+#define BLOCK_SIZE 4096      /* bytes */
 #define MAX_FILE_NAME 12
 #define NUM_IBLOCKS 5
 #define INODES_PER_BLOCK 4
@@ -55,13 +55,13 @@ typedef struct data {
 typedef struct inode {
     _Bool isvalid;          //1- is inode in use?
     _Bool isdir;            //1- is the file a directory?
-    unsigned parent_dir;    //4- inode of parent directory
+    int parent_dir;    //4- inode of parent directory
 
-    unsigned inum;          //4- low-level name
+    int inum;          //4- low-level name
     char name[12];          //12- filename
     char extension[4];      //4- file extension
 
-    unsigned file_size;     //4- in bytes
+    int file_size;     //4- in bytes
 
     char creationdate[25];  //25- creation timestamp
     char lastmodified[25];  //25- last modification timestamp
@@ -90,7 +90,8 @@ void map();
 void superblock_init(superblock *sb);
 void imap_init(imap *im);
 void dmap_init(dmap *dm);
-int inode_init(char *filename, int dataAddr, int free_node, _Bool isDir);
+void inode_init(inode *in[]);
+void inode_create(char *filename, int dataAddr, int free_node, _Bool isDir);
 int find_free_inode(imap *im);
 int find_free_datblock(dmap *dm);
 void getDatetime(char *dateTime);
