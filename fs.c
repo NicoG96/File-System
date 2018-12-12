@@ -10,50 +10,146 @@ void map() {
     }
 
     //begin with superblock
-    sb = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE , MAP_SHARED, fs, 0);
+    sb = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fs, 0);
     if(sb == MAP_FAILED){
         close(fs);
-        perror("Error mmapping superblock");
+        perror("Error mapping superblock");
         exit(EXIT_FAILURE);
     }
 
     //then inode bitmap
-    //imap = mmap(NULL,sizeof(imap), PROT_READ | PROT_WRITE , MAP_SHARED , fs, 512);
+    im = mmap(NULL, sizeof(imap), PROT_READ | PROT_WRITE, MAP_SHARED, fs, 0);
+    if(im == MAP_FAILED){
+        close(fs);
+        perror("Error mapping inode bitmap");
+        exit(EXIT_FAILURE);
+    }
 
     //then data bitmap
-    //dmap = mmap(NULL,sizeof(bmap), PROT_READ | PROT_WRITE , MAP_SHARED , fs, sizeof(sb) + sizeof(imap));
+    dm = mmap(NULL, sizeof(dmap), PROT_READ | PROT_WRITE , MAP_SHARED , fs, 0);
+    if(dm == MAP_FAILED){
+        close(fs);
+        perror("Error mapping data bitmap");
+        exit(EXIT_FAILURE);
+    }
 
-    //then inode group
-    //then directory folder
+    //then inode group, 5 blocks, 4 inodes per block = 20 inodes
+    for(int i = 0; i < 20; i++) {
+        in[i] = mmap(NULL, sizeof(inode), PROT_READ | PROT_WRITE , MAP_SHARED , fs, 0);
+        if(in[i] == MAP_FAILED){
+            close(fs);
+            perror("Error mapping inode blocks");
+            exit(EXIT_FAILURE);
+        }
+    }
+
     //finally the data blocks
+    /* total bytes used by FS = 4096 -> TOTAL_BLOCKS*8 - 4096 = 27,152 */
+    dat = mmap(NULL, sizeof(data), PROT_READ | PROT_WRITE , MAP_SHARED , fs, 0);
+    if(dat == MAP_FAILED){
+        close(fs);
+        perror("Error mapping data blocks");
+        exit(EXIT_FAILURE);
+    }
 
-
-    //initialize SB
+    //initialize blocks
     superblock_init(sb);
+    imap_init(im);
+    dmap_init(dm);
 
-    fsync(fs);
-    close(fs);
+    //set up root folder
+    inode_init("root", sb->data, 0, 1);
 
+    //set current directory to root
+    curr_dir = in[0];
 }
 
 void superblock_init(superblock *sb) {
+    //blocks
     sb->block_size = BLOCK_SIZE;
-    sb->num_blocks = MAX_BLOCKS;
+    sb->num_blocks = TOTAL_BLOCKS;
 
+    //files
+    sb->max_fsize = MAX_FILE_SIZE * 8;
 
-    sb->numiblocks = 1;
-    sb->numinodes = 2;
-    sb-> i_size = 3;
+    //inodes
+    sb->nodes_per_block = INODES_PER_BLOCK;
+    sb->numiblocks = NUM_IBLOCKS;
+    sb->numinodes = INODES_PER_BLOCK * NUM_IBLOCKS;
 
-    sb->dmap = 4;
-    sb->imap = 5;
-    sb->data = 6;
+    //location in memory
+    sb->imap = BLOCK_SIZE;
+    sb->dmap = BLOCK_SIZE * 2;
+    sb->inodes = BLOCK_SIZE * 3;
+    sb->data = (BLOCK_SIZE * 3) + (BLOCK_SIZE * 5);
 
-    sb->dmap_size = 7;
-    sb->imap_size = 8;
-    sb->data_size = 9;
+    //sizes
+    sb->imap_size = sizeof(imap);
+    sb->dmap_size = sizeof(dmap);
+    sb->inode_size = sizeof(inode);
+    sb->data_size = sizeof(data);
 
-    sb->root_dir = 10;
+    //root folder is first block
+    sb->root_dir = sb->inodes;
+}
+
+void imap_init(imap *im) {
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        im->occupied[i] = 0;
+    }
+}
+
+void dmap_init(dmap *dm) {
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        dm->occupied[i] = 0;
+    }
+}
+
+int inode_init(char *filename, int dataAddr, int free_node, _Bool isDir) {
+    in[free_node]->isvalid = 1;
+    in[free_node]->isdir = 1;
+
+    strcmp(filename, "root") == 0 ?
+    (in[free_node]->parent_dir = 0) :
+    (in[free_node]->parent_dir = curr_dir->inum);
+
+    in[free_node]->inum = (unsigned) free_node;
+    in[free_node]->file_size = 0;
+    strcpy(in[free_node]->name, filename);
+
+    isDir ?
+    strcpy(in[free_node]->extension, "dir") :
+    strcpy(in[free_node]->extension, "txt");
+
+    getDatetime(in[free_node]->creationdate);
+    getDatetime(in[free_node]->lastmodified);
+    in[free_node]->data_ptr[0] = (unsigned) dataAddr;
+
+    for(int i = 1; i < DBLOCKS_PER_INODE; i++) {
+        in[free_node]->data_ptr[i] = -1;
+    }
+    return free_node;
+}
+
+int find_free_datblock(dmap *dm) {
+    //scan the iblock bitmap, find first available block
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        if(!dm->occupied[i]) {
+            dm->occupied[i] = 1;
+            return i;
+        }
+    }
+    return -1;
+}
+
+int find_free_inode(imap *im) {
+    for(int i = 0; i < BLOCK_SIZE; i++) {
+        if(!im->occupied[i]) {
+            im->occupied[i] = 1;
+            return i;
+        }
+    }
+    return -1;
 }
 
 void getDatetime(char *dateTime) {
@@ -62,21 +158,3 @@ void getDatetime(char *dateTime) {
     char *buf = asctime(tm);
     strncpy(dateTime, buf, 25); /* 25 bytes is len of asctime return */
 }
-
-void directory_init(directory *root) {}
-
-/*
- * void disk_read( int blocknum, char *data )
-{
-	sanity_check(blocknum,data);
-
-	fseek(diskfile,blocknum*DISK_BLOCK_SIZE,SEEK_SET);
-
-	if(fread(data,DISK_BLOCK_SIZE,1,diskfile)==1) {
-		nreads++;
-	} else {
-		printf("ERROR: couldn't access simulated disk: %s\n",strerror(errno));
-		abort();
-	}
-}
- */
