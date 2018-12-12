@@ -18,7 +18,7 @@ void map() {
     }
 
     //then inode bitmap
-    im = mmap(NULL, sizeof(imap), PROT_READ | PROT_WRITE, MAP_SHARED, fs, 0);
+    im = mmap(NULL, sizeof(imap), PROT_READ | PROT_WRITE, MAP_SHARED, fs, BLOCK_SIZE);
     if(im == MAP_FAILED){
         close(fs);
         perror("Error mapping inode bitmap");
@@ -26,7 +26,7 @@ void map() {
     }
 
     //then data bitmap
-    dm = mmap(NULL, sizeof(dmap), PROT_READ | PROT_WRITE , MAP_SHARED , fs, 0);
+    dm = mmap(NULL, sizeof(dmap), PROT_READ | PROT_WRITE , MAP_SHARED , fs, BLOCK_SIZE*2);
     if(dm == MAP_FAILED){
         close(fs);
         perror("Error mapping data bitmap");
@@ -35,7 +35,7 @@ void map() {
 
     //then inode group, 5 blocks, 4 inodes per block = 20 inodes
     for(int i = 0; i < 20; i++) {
-        in[i] = mmap(NULL, sizeof(inode), PROT_READ | PROT_WRITE , MAP_SHARED , fs, 0);
+        in[i] = mmap(NULL, sizeof(inode), PROT_READ | PROT_WRITE , MAP_SHARED , fs, (BLOCK_SIZE * 3) + (BLOCK_SIZE * i));
         if(in[i] == MAP_FAILED){
             close(fs);
             perror("Error mapping inode blocks");
@@ -45,7 +45,7 @@ void map() {
 
     //finally the data blocks
     /* total bytes used by FS = 4096 -> TOTAL_BLOCKS*8 - 4096 = 27,152 */
-    dat = mmap(NULL, sizeof(data), PROT_READ | PROT_WRITE , MAP_SHARED , fs, 0);
+    dat = mmap(NULL, sizeof(data), PROT_READ | PROT_WRITE , MAP_SHARED , fs, BLOCK_SIZE * 24);
     if(dat == MAP_FAILED){
         close(fs);
         perror("Error mapping data blocks");
@@ -56,9 +56,10 @@ void map() {
     superblock_init(sb);
     imap_init(im);
     dmap_init(dm);
+    inode_init(in);
 
     //set up root folder
-    inode_init("root", sb->data, 0, 1);
+    newfile("root");
 
     //set current directory to root
     curr_dir = in[0];
@@ -81,7 +82,7 @@ void superblock_init(superblock *sb) {
     sb->imap = BLOCK_SIZE;
     sb->dmap = BLOCK_SIZE * 2;
     sb->inodes = BLOCK_SIZE * 3;
-    sb->data = (BLOCK_SIZE * 3) + (BLOCK_SIZE * 5);
+    sb->data = BLOCK_SIZE * 24;
 
     //sizes
     sb->imap_size = sizeof(imap);
@@ -105,7 +106,20 @@ void dmap_init(dmap *dm) {
     }
 }
 
-int inode_init(char *filename, int dataAddr, int free_node, _Bool isDir) {
+void inode_init(inode *in[]) {
+    for(int i = 0; i < NUM_INODES; i++) {
+        in[i]->isvalid = 0;
+        in[i]->isdir = 0;
+        in[i]->parent_dir = -1;
+        in[i]->inum = -1;
+        in[i]->file_size = -1;
+        for(int j = 0; j < DBLOCKS_PER_INODE; j++) {
+            in[i]->data_ptr[j] = -1;
+        }
+    }
+}
+
+void inode_create(char *filename, int dataAddr, int free_node, _Bool isDir) {
     in[free_node]->isvalid = 1;
     in[free_node]->isdir = 1;
 
@@ -124,11 +138,6 @@ int inode_init(char *filename, int dataAddr, int free_node, _Bool isDir) {
     getDatetime(in[free_node]->creationdate);
     getDatetime(in[free_node]->lastmodified);
     in[free_node]->data_ptr[0] = (unsigned) dataAddr;
-
-    for(int i = 1; i < DBLOCKS_PER_INODE; i++) {
-        in[free_node]->data_ptr[i] = -1;
-    }
-    return free_node;
 }
 
 int find_free_datblock(dmap *dm) {
