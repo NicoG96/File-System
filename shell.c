@@ -47,10 +47,18 @@ void shell() {
         }else if(strcmp(input, "close") == 0) {
             closef();
 
-        }else if(strcmp(input, "read") == 0) {
+        }else if(strncmp(input, "read", 4) == 0) {
+            if(get_file_name(input, filename)) {
+                puts("Please specify the folder to open.");
+                continue;
+            }
             readf(filename);
 
-        }else if(strcmp(input, "write") == 0) {
+        }else if(strncmp(input, "write", 5) == 0) {
+            if(get_file_name(input, filename)) {
+                puts("Please specify the folder to open.");
+                continue;
+            }
             writef(filename);
 
         }else if(strncmp(input, "delete", 6) == 0) {
@@ -110,8 +118,8 @@ void print_manual() {
     printf("\t-%s\n", "open [directory]:\tOpens specified folder");
     printf("\t-%s\n", "delete [file]:\t\tDeletes the specified file");
     printf("\t-%s\n", "close:\t\t\tCloses currently open folder");
-    printf("\t-%s\n", "read:\t\t\tReads the currently open file");
-    printf("\t-%s\n", "write:\t\t\tWrites to currently open file");
+    printf("\t-%s\n", "read [file]:\t\tReads the currently open file");
+    printf("\t-%s\n", "write [file]:\t\tWrites to currently open file");
     printf("\t-%s\n", "list:\t\t\tLists the items in the current directory");
     printf("\t-%s\n", "help:\t\t\tDisplay this prompt");
     printf("\t-%s\n", "exit:\t\t\tExits the filesystem");
