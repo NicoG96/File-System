@@ -6,57 +6,101 @@
 
 
 /* MACROS */
-#define MAX_BLOCKS 3906     /* blocks, floor of 2MB file / 512 */
-#define MAX_FILE_NAME 12    /* 8 for file, 4 for extension */
+#define TOTAL_BLOCKS 3906   /* blocks, floor of 2MB file / 512 */
 #define MAX_FILE_SIZE 64    /* blocks */
 #define BLOCK_SIZE 512      /* bytes */
-#define INODES_PER_BLOCK 6
-#define POINTERS_PER_INODE 12
-#define POINTERS_PER_BLOCK 128
-
-
-/* GLOBALS */
-FILE *fs;
+#define MAX_FILE_NAME 12
+#define NUM_IBLOCKS 5
+#define INODES_PER_BLOCK 4
+#define DBLOCKS_PER_INODE 12
+#define NUM_INODES 20
 
 
 /* STRUCTS */
 typedef struct superblock {
-    unsigned block_size; //size of blocks
-    unsigned num_blocks; //# of blocks (total)
-    unsigned num_free;   //# of blocks free
+    unsigned block_size; //4- size of blocks
+    unsigned num_blocks; //4- # of blocks (total)
 
-    unsigned numiblocks; //# of inode blocks
-    unsigned numinodes;  //# of inodes
-    unsigned i_size;     //size of inode
+    unsigned max_fsize;  //4- in bytes
 
-    unsigned dmap;       //starting block of dmap
-    unsigned imap;       //starting block of imap
-    unsigned data;       //starting block of data table
+    unsigned numiblocks; //4- # of inode blocks
+    unsigned numinodes;  //4- # of inodes
+    unsigned nodes_per_block; //4
 
-    unsigned dmap_size;  //# of blocks in data bitmap
-    unsigned imap_size;  //# of blocks in inode bitmap
+    unsigned dmap;       //4- starting block of dmap
+    unsigned imap;       //4- starting block of imap
+    unsigned inodes;     //4- starting block for inodes
+    unsigned data;       //4- starting block of data table
 
-    unsigned root_dir;   //starting block of root directory
+    unsigned dmap_size;  //4- # of blocks in data bitmap
+    unsigned imap_size;  //4- # of blocks in inode bitmap
+    unsigned data_size;  //4- # of blocks in inode bitmap
+    unsigned inode_size; //4- size of inode block
+
+    unsigned root_dir;   //4- starting block of root directory
 }superblock;
 
+typedef struct imap {
+    _Bool occupied[BLOCK_SIZE];
+}imap;
+
+typedef struct dmap {
+    _Bool occupied[BLOCK_SIZE];
+}dmap;
+
+typedef struct data {
+    char d[27152];
+}data;
 
 typedef struct inode {
-    char *name;              //high-level name
-    unsigned inum;           //low-level name
-    int isvalid;             //is this file in use?
-    int isdirectory;         //is this file a directory?
-    int parent;              //parent directory
-    unsigned size;           //size of file (bytes)
-    unsigned indirect;       //pointer to indirect inodes
-    time_t creationdate;     //creation timestamp
-    time_t lastmodified;     //last modification timestamp
-    char *type;              //type of file
-    unsigned direct[POINTERS_PER_INODE]; //pointers to data
+    _Bool isvalid;          //1- is inode in use?
+    _Bool isdir;            //1- is the file a directory?
+    unsigned parent_dir;    //4- inode of parent directory
+
+    unsigned inum;          //4- low-level name
+    char name[12];          //12- filename
+    char extension[4];      //4- file extension
+
+    unsigned file_size;     //4- in bytes
+
+    char creationdate[25];  //25- creation timestamp
+    char lastmodified[25];  //25- last modification timestamp
+
+    int data_ptr[DBLOCKS_PER_INODE]; //48- 12 pointers to file data
 }inode;
 
 
+/* GLOBALS */
+int fs;
+superblock *sb;
+imap *im;
+dmap *dm;
+inode *in[NUM_INODES];
+data *dat;
+inode *curr_dir;
+
+
 /* FUNCTIONS */
+void print_manual();
+
 void shell();
 int get_file_name(char *input, char filename[]);
-void print_manual();
+
 void map();
+void superblock_init(superblock *sb);
+void imap_init(imap *im);
+void dmap_init(dmap *dm);
+int inode_init(char *filename, int dataAddr, int free_node, _Bool isDir);
+int find_free_inode(imap *im);
+int find_free_datblock(dmap *dm);
+void getDatetime(char *dateTime);
+
+void mkdir(char *filename);
+void newfile(char *filename);
+int openf(char *filename);
+int delete(char *filename);
+int closef();
+int readf(char *filename);
+int writef(char *filename);
+void list();
+int update_dir(int inode);
