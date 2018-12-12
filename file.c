@@ -10,10 +10,10 @@ void mkdir(char *filename) {
     int dataAddr = (dblock * BLOCK_SIZE + sb->data);
 
     //initialize inode
-    int filenode = inode_init(filename, dataAddr, free_node, 1);
+    inode_create(filename, dataAddr, free_node, 1);
 
     //update directory list with new file
-    if(update_dir(filenode)) {
+    if(update_dir(free_node)) {
         perror("Directory full");
     } else {
         printf("Directory '%s' successfully created\n", filename);
@@ -29,22 +29,31 @@ void newfile(char *filename) {
     int dataAddr = (dblock * BLOCK_SIZE + sb->data);
 
     //initialize inode
-    int filenode = inode_init(filename, dataAddr, free_node, 0);
+    inode_create(filename, dataAddr, free_node, 0);
 
     //update directory list with new file
-    if(update_dir(filenode)) {
-        perror("Directory full");
-    } else {
-        printf("File '%s' successfully created\n", filename);
+    if(strcmp(filename, "root") != 0) {
+        if(update_dir(free_node)) {
+            perror("Directory full");
+        } else {
+            printf("File '%s' successfully created\n", filename);
+        }
     }
 }
 
 int openf(char *filename) {
     for(int i = 0; i < NUM_INODES; i++) {
         if(strcmp(filename, in[i]->name) == 0) {
-            curr_dir = in[i];
-            printf("Opened '%s'", filename);
-            return 0;
+            if(in[i]->isdir) {
+                curr_dir = in[i];
+                printf("Opened '%s'\n", filename);
+                //printf("%s\n", curr_dir->name);
+                return 0;
+            }
+            else {
+                perror("File is not a directory");
+            }
+
         }
     }
     perror("File not found");
@@ -102,13 +111,18 @@ int closef() {
 int readf(char *filename) {
     for(int i = 0; i < NUM_INODES; i++) {
         if(strcmp(filename, in[i]->name) == 0) {
-            fseek(diskfile,blocknum*DISK_BLOCK_SIZE,SEEK_SET);
+            FILE *filesys = fdopen(fs, "w+");
+            char buf[BLOCK_SIZE];
+            inode *read = in[i];
+            int j = 0;
 
-            if(fread(data,DISK_BLOCK_SIZE,1,diskfile)==1) {
-                nreads++;
-            } else {
-                printf("ERROR: couldn't access simulated disk: %s\n",strerror(errno));
-                abort();
+            //count the data blocks it occupies
+            while(read->data_ptr[j] >= 0 && j < DBLOCKS_PER_INODE) {
+                fseek(filesys, read->data_ptr[j], SEEK_SET);
+
+                fread(buf, BLOCK_SIZE, 1, filesys);
+                printf("%s", buf);
+                j++;
             }
             return 0;
         }
@@ -120,7 +134,28 @@ int readf(char *filename) {
 int writef(char *filename) {
     for(int i = 0; i < NUM_INODES; i++) {
         if(strcmp(filename, in[i]->name) == 0) {
+            char buf[BLOCK_SIZE];
+            FILE *filesys = fdopen(fs, "w+");
+            inode *read = in[i];
 
+            //get user input
+            puts("Please enter data to write:");
+            fgets(buf, 512, stdin);
+            //printf("%s\n", buf);
+
+            fseek(filesys, read->data_ptr[0], SEEK_SET);
+            fwrite(buf, BLOCK_SIZE, 1, filesys);
+
+            /* TEST */
+            /*
+            char out[BLOCK_SIZE];
+            fseek(filesys, read->data_ptr[0], SEEK_SET);
+            fread(out, BLOCK_SIZE, 1, filesys);
+            printf("%s\n", out);
+            */
+
+            fsync(fs);
+            puts("Successful write.");
             return 0;
         }
     }
