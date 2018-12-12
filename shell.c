@@ -27,7 +27,7 @@ void shell() {
                 continue;
             }
 
-            //mkdir
+            mkdir(filename);
 
         }else if(strncmp(input, "newfile", 7) == 0) {
             if(get_file_name(input, filename)) {
@@ -35,33 +35,33 @@ void shell() {
                 continue;
             }
 
-            //makefile
+            newfile(filename);
 
         }else if(strncmp(input, "open", 4) == 0) {
             if(get_file_name(input, filename)) {
                 puts("Please specify the folder to open.");
                 continue;
             }
-            //open file
+            openf(filename);
 
         }else if(strcmp(input, "close") == 0) {
-            //close file
+            closef();
 
         }else if(strcmp(input, "read") == 0) {
-            //read file
+            readf(filename);
 
         }else if(strcmp(input, "write") == 0) {
-            //write to file
+            writef(filename);
 
         }else if(strncmp(input, "delete", 6) == 0) {
             if(get_file_name(input, filename)) {
                 puts("Please specify the file to delete.");
                 continue;
             }
-            //delete file
+            delete(filename);
 
         }else if(strcmp(input, "list") == 0) {
-            //print dir
+            list();
 
         }else if(strcmp(input, "help") == 0) {
             print_manual();
@@ -75,7 +75,6 @@ void shell() {
 
         //printf("%s\n", filename);
     }
-
     free(input);
 }
 
